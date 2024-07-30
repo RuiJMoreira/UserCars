@@ -5,11 +5,28 @@ var fileName = "filintomota_car_data.csv";
 
 // Function with all logic
 function main() {
-  // URL of the API
-  var url = "https://www.filintomota.pt/wp-admin/admin-ajax.php?action=carsearch&form_id=search-results&nonce=3e1bcc334a&valueMaker=all&valueModel=all&valueFuel=all&valueSearchType=used&valueColor=all&valueGearbox=all&valueSeats=all&valueCondition=all&valueGroup=all&valueIntend=all&valueBodytype=all&valuePrice=&valueYear=&valueMileage=&valueInStock=false&valueOrderBy=price_asc&wasFullPrice=true&wasFullYear=true&wasFullMileage=true&renderedVehicles=0";
+  // URL of the source page
+  var sourceUrl = "https://www.filintomota.pt/?s=&search_tab=used";
+
+  // Fetch the source page HTML
+  var sourceResponse = UrlFetchApp.fetch(sourceUrl);
+  var sourceHtml = sourceResponse.getContentText();
+
+  // Extract the nonce using regex
+  var noncePattern = /"ajax_nonce":"([^"]*)"/;
+  var nonceMatch = sourceHtml.match(noncePattern);
+  var nonce = nonceMatch ? nonceMatch[1] : null;
+
+  if (!nonce) {
+    Logger.log("Failed to extract nonce.");
+    return;
+  }
+
+  // Construct the API URL with the extracted nonce
+  var apiUrl = "https://www.filintomota.pt/wp-admin/admin-ajax.php?action=carsearch&form_id=search-results&nonce=" + nonce + "&valueMaker=all&valueModel=all&valueFuel=all&valueSearchType=used&valueColor=all&valueGearbox=all&valueSeats=all&valueCondition=all&valueGroup=all&valueIntend=all&valueBodytype=all&valuePrice=&valueYear=&valueMileage=&valueInStock=false&valueOrderBy=price_asc&wasFullPrice=true&wasFullYear=true&wasFullMileage=true&renderedVehicles=0";
 
   // Fetch JSON content from the API
-  var response = UrlFetchApp.fetch(url);
+  var response = UrlFetchApp.fetch(apiUrl);
   var jsonData = JSON.parse(response.getContentText()).posts;
 
   // Initialize array to store car details
@@ -23,44 +40,44 @@ function main() {
   var mileagePattern = /<div class="characteristics-kms">\s*([^<]*)\s*<\/div>/;
   var pricePattern = /<span class="vehicle-card__value">([^<]*)<\/span>/;
 
-
   // Read existing car URLs and prices from Google Drive
   var sentCarData = readSentCarData();
   
   // Parse the HTML content to extract car details
   jsonData.forEach(function(post) {
-  var car = {};
+    var car = {};
 
-  var titleMatch = post.match(titlePattern);
-  car.title = titleMatch ? titleMatch[1].trim() : "Unknown";
+    var titleMatch = post.match(titlePattern);
+    car.title = titleMatch ? titleMatch[1].trim() : "Unknown";
 
-  var urlMatch = post.match(urlPattern);
-  car.url = urlMatch ? urlMatch[1].trim() : "#";
+    var urlMatch = post.match(urlPattern);
+    car.url = urlMatch ? urlMatch[1].trim() : "#";
 
-  var fuelMatch = post.match(fuelPattern);
-  car.fuel = fuelMatch ? fuelMatch[1].trim() : "Unknown";
+    var fuelMatch = post.match(fuelPattern);
+    car.fuel = fuelMatch ? fuelMatch[1].trim() : "Unknown";
 
-  var yearMatch = post.match(yearPattern);
-  car.year = yearMatch ? yearMatch[1].trim() : "Unknown";
+    var yearMatch = post.match(yearPattern);
+    car.year = yearMatch ? yearMatch[1].trim() : "Unknown";
 
-  var mileageMatch = post.match(mileagePattern);
-  car.mileage = mileageMatch ? mileageMatch[1].trim() : "Unknown";
+    var mileageMatch = post.match(mileagePattern);
+    car.mileage = mileageMatch ? mileageMatch[1].trim() : "Unknown";
 
-  var priceMatch = post.match(pricePattern);
-  if (priceMatch) {
-    car.price = priceMatch[1].replace('€', '').replace('.', '').trim();
-    car.price = parseFloat(car.price);
-  } else {
-    car.price = 0;
-  }
-
-  // Filter cars by price to be under 15000€
-  if (car.price > 1000 && car.price <= 15000) {
-    if (!sentCarData[car.url] || sentCarData[car.url] != car.price) {
-      cars.push(car);
+    var priceMatch = post.match(pricePattern);
+    if (priceMatch) {
+      car.price = priceMatch[1].replace('€', '').replace('.', '').trim();
+      car.price = parseFloat(car.price);
+    } else {
+      car.price = 0;
     }
-  }
-});
+
+    // Filter cars by price to be under 15000€
+    if (car.price > 1000 && car.price <= 15000) {
+      if (!sentCarData[car.url] || sentCarData[car.url] != car.price) {
+        cars.push(car);
+      }
+    }
+  });
+
   // Sort cars by price from lowest to highest
   cars.sort(function(a, b) {
     return a.price - b.price;
@@ -93,43 +110,6 @@ function main() {
     appendCarDataToFile(newCarData);
   } else {
     Logger.log("No cars found with the specified criteria.");
-  }
-}
-
-// Split the message into parts within the character limit
-function splitMessage(message, limit) {
-  var parts = [];
-  while (message.length > limit) {
-    var part = message.substring(0, limit);
-    var lastNewlineIndex = part.lastIndexOf('\n');
-    if (lastNewlineIndex > -1) {
-      part = message.substring(0, lastNewlineIndex + 1);
-    }
-    parts.push(part);
-    message = message.substring(part.length);
-  }
-  parts.push(message);
-  return parts;
-}
-
-// Send message via Telegram function
-function sendTelegramMessage(message) {
-  var params = {
-    "method": "post",
-    "payload": {
-      "chat_id": telegram_id,
-      "text": date + "\n\n" + message
-    }
-  };
-  var response = UrlFetchApp.fetch("https://api.telegram.org/YourBotToken/sendMessage", params);
-  if (response.getResponseCode() == 200) {
-    Logger.log("Message sent successfully");
-  } else {
-    if (debug) {
-      Logger.log(response.getContentText());
-    } else {
-      Logger.log("Failed to send message");
-    }
   }
 }
 

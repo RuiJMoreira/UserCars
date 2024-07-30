@@ -76,6 +76,7 @@ This repository includes multiple scripts that interact with different car data 
 3. **Script Configuration:**
    - Copy the bot token and set it in the `sendTelegramMessage` function in each script.
    - Get your chat ID and set it in the `telegram_id` variable.
+   - Configure the price range for each script.
 
 ## Usage
 
